@@ -1,0 +1,23 @@
+# Core
+python-dateutil>=2.8.2
+pytz>=2023.3
+
+# Data
+pandas>=2.0.0
+numpy>=1.24.0
+pyarrow>=14.0.0      # đọc/ghi parquet
+faker >=18.9.0       # tạo dữ liệu giả
+
+# Config
+pyyaml>=6.0.1
+
+# AWS S3/MinIO
+boto3>=1.34.0
+botocore>=1.34.0
+
+# API
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+
+# Validation
+pydantic>=2.5.0

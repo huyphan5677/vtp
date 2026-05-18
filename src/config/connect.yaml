@@ -1,0 +1,16 @@
+# Output to postgres
+postgres:
+  host: oms-merchant-score1
+  port: 5432
+  database: scoredb
+  user: scoreuser
+  password: PqOQe58Gw6Hkv
+  schema: public
+  table_name: tbl_output_scoring
+
+# Output to MinIO
+minio:
+  endpoint: minio:9990
+  access_key: minio
+  secret_key: minio123
+  bucket: clean-202605
