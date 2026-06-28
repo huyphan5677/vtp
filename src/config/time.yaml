@@ -1,9 +1,0 @@
-groupby_data: # gộp dữ liệu tổng hợp theo tháng
-  from: 2025-12-01
-  to: 2025-12-31
-
-pipeline_day_data: # hiện tại thì chưa dùng nhưng mai này được sử dụng để chạy pipeline làm sạch dữ liệu từ ngày ... đến ngày ...
-  from: 2025-12-01
-  to: 2025-12-31
-
-scoring_month: 2022-09 # tháng mà ta đang mô hình scoring

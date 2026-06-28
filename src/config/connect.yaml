@@ -1,4 +1,4 @@
-# Output to postgres
+# Connect to postgres
 postgres:
   host: oms-merchant-score1
   port: 5432
@@ -8,7 +8,7 @@ postgres:
   schema: public
   table_name: tbl_output_scoring
 
-# Output to MinIO
+# Connect to MinIO
 minio:
   endpoint: minio:9990
   access_key: minio

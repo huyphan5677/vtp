@@ -1,14 +1,16 @@
-import os
+from __future__ import annotations
+
 from pathlib import Path
+
 
 # dinh nghĩa thư mục gốc
 ROOT_DIR = Path(__file__).parent.parent
 
 # định nghĩa data nguồn
-DAY_DIR_PATH = f"/opt/airflow/data/data_hitech_day"
+DAY_DIR_PATH = "/opt/airflow/data/data_hitech_day"
 # DAY_DIR_PATH = f"/data/ftpuser/data/ftpuser/data/data_hitech_day"
 
-MONTH_DIR_PATH = f"/opt/airflow/dags/vtp/src/data/hitech_month"
+MONTH_DIR_PATH = "/opt/airflow/dags/vtp/src/data/hitech_month"
 # MONTH_DIR_PATH = f"/data/ftpuser/data/ftpuser/data/data_hitech_month"
 
 # định nghĩa folder xuất ra
