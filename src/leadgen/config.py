@@ -1,0 +1,1 @@
+STRATEGY_CONFIG = '/Users/luannguyen/Downloads/vtp/src/leadgen/strategies/20260701_setting_strategy.xlsx'
