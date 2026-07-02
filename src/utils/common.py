@@ -2,11 +2,19 @@ from __future__ import annotations
 
 import shlex
 import pathlib
+import calendar
 
 import yaml
 from loguru import logger
 
 from src.config.data_path import CONFIG_PATH
+
+
+def month_date_range(month: str) -> tuple[str, str]:
+    """Đổi tháng dạng 'YYYYMM' thành (ngày đầu tháng, ngày cuối tháng) dạng 'YYYYMMDD'."""
+    year, mon = int(month[:4]), int(month[4:6])
+    last_day = calendar.monthrange(year, mon)[1]
+    return f"{month}01", f"{month}{last_day:02d}"
 
 
 def load_config(yml_file_name: str):
@@ -18,22 +26,6 @@ def load_config(yml_file_name: str):
     with pathlib.Path(config_file_path).open(encoding="utf-8") as f:
         config = yaml.safe_load(f)
     return config
-
-
-def with_config(yml_file: str):
-    """Decorator đảm bảo load config trước khi chạy hàm, truyền thêm kwarg 'config'."""
-
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            config = kwargs.pop("config", None)
-            if config is None:
-                config = load_config(yml_file)
-            return func(*args, config=config, **kwargs)
-
-        return wrapper
-
-    return decorator
 
 
 def process_args_to_dict(args_string: str) -> dict[str, str | None]:

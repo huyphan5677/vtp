@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from src.utils.load_config import load_config
+from src.utils.common import load_config
 
 
 def get_postgres_connection(config_file: str = "connect.yaml"):

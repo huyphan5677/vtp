@@ -1,0 +1,56 @@
+version: "3.8"
+
+# Mô phỏng local: MinIO (thay S3), Postgres (thay DB scoring) và pgweb (xem
+# Postgres qua web). Credentials khớp với src/config/connect.yaml.
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: vtp_minio
+    command: server /data --address ":9990" --console-address ":9991"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9990:9990" # S3 API (khớp minio.endpoint trong connect.yaml)
+      - "9991:9991" # Web console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9990/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: vtp_postgres
+    environment:
+      POSTGRES_USER: scoreuser
+      POSTGRES_PASSWORD: scorepass
+      POSTGRES_DB: scoredb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scoreuser -d scoredb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgweb:
+    image: sosedoff/pgweb:latest
+    container_name: vtp_pgweb
+    environment:
+      PGWEB_DATABASE_URL: postgres://scoreuser:scorepass@postgres:5432/scoredb?sslmode=disable
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  minio_data:
+  postgres_data:

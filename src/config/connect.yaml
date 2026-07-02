@@ -1,10 +1,10 @@
 # Connect to postgres
 postgres:
-  host: oms-merchant-score1
+  host: postgres
   port: 5432
   database: scoredb
   user: scoreuser
-  password: PqOQe58Gw6Hkv
+  password: scorepass
   schema: public
   table_name: tbl_output_scoring
 

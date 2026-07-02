@@ -1,260 +1,188 @@
 from __future__ import annotations
 
 import sys
+import inspect
+import importlib
 from datetime import datetime, timedelta
+from functools import reduce
 
-import numpy as np
 import pandas as pd
 from loguru import logger
 
 from src.utils import common as utils
-from src.utils.common import with_config
-from src.utils.extract import (
-    extract_day_data,
-    extract_data_by_date,
-    extract_scoring_data,
-)
-from src.utils.minio_client import (
-    load_data_to_minio,
-    load_clean_data_to_minio,
-)
-from src.utils.grouping_data import group_data_by_month
-from src.utils.postgres_client import load_data_to_postgres
-from src.data_processing.preprocesssor import (
-    main_pipeline_day,
-)
-from src.data_processing.transform.age import (
-    transform_nam_tuoi,
-    feature_engineering_date_of_birth,
-)
-from src.data_processing.transform.gmv import (
-    transform_gmv_3th,
-    transform_gmv_12th,
-)
-from src.data_processing.transform.avg_order_count import (
-    transform_avg_success_order_count_per_month,
-)
-from src.data_processing.transform.avg_order_value import (
-    transform_avg_success_order_value_per_month,
-    transform_total_success_order_value_per_month,
-)
-from src.data_processing.transform.sales_region_latest import (
-    transform_sales_region,
-)
-from src.data_processing.transform.usage_duration_months import (
-    transform_usage_duration_months,
-    feature_engineering_usage_duration,
-)
-from src.data_processing.transform.revenue_decline_months import (
-    transform_revenue_decline_last_n_months,
-)
-from src.data_processing.transform.revenue_decline_quarters import (
-    transform_revenue_decline_last_n_quarters,
-)
-from src.data_processing.transform.success_order_all_months import (
-    transform_success_order_all_months,
-)
-from src.data_processing.transform.active_months_with_orders import (
-    transform_total_success_order,
-)
+from src.utils.common import load_config
+from src.utils.minio_client import save_to_minio, read_minio_parquet
 
 
-def main_pipeline_by_day(date: str) -> pd.DataFrame:
-    """Xử lý dữ liệu theo ngày.
+FEATURES_CONFIG_FILE = "features.yaml"
 
-    xuất ra file parquet dữ liệu được xử lý
 
-    Returns:
-        pd.DataFrame: Dữ liệu được xử lý
+def _get_global_config() -> dict:
+    """Lấy config chung (áp dụng cho mọi feature) từ features.yaml."""
+    return load_config(FEATURES_CONFIG_FILE).get("config", {})
+
+
+def _get_feature_config(feature_name: str) -> dict:
+    """Lấy config của 1 feature theo tên (name) từ features.yaml."""
+    for feature_cfg in load_config(FEATURES_CONFIG_FILE)["features"]:
+        if feature_cfg["name"] == feature_name:
+            return feature_cfg
+    raise ValueError(
+        f"Không tìm thấy feature '{feature_name}' trong features.yaml"
+    )
+
+
+def _get_day_feature_config(day_feature: str) -> dict:
+    """Trả về feature config đại diện cho 1 day_feature.
+
+    Nhiều rule instance (name) có thể dùng chung 1 day_feature (ví dụ
+    order_l3m/order_l6m dùng chung "order") — chỉ cần tìm 1 entry khớp.
     """
-    logger.info(f"Start pipeline day data for {date}")
-    day_data = extract_day_data(date)
-    day_data = main_pipeline_day(day_data)
-    day_data = feature_engineering_date_of_birth(day_data, "ngay_sinh")
-    day_data = feature_engineering_usage_duration(day_data, "ngay_hoptac")
-
-    # Save data to minio
-    load_clean_data_to_minio(folder_name="hitech_day", date=date, data=day_data)
-    logger.info(f"Pipeline day data completed for {date}")
-
-    return day_data
+    for feature_cfg in load_config(FEATURES_CONFIG_FILE)["features"]:
+        if feature_cfg["day_feature"] == day_feature:
+            return feature_cfg
+    raise ValueError(
+        f"Không tìm thấy day_feature '{day_feature}' trong features.yaml"
+    )
 
 
-def main_pipeline_by_month(start_date, end_date):
-    """Xử lý dữ liệu theo tháng.
+def _call_with_declared_kwargs(func, *args, **candidate_kwargs) -> None:
+    """Gọi func(*args, **kwargs) chỉ với các kwargs mà func khai báo.
 
-    xuất ra file parquet dữ liệu được xử lý
+    Cho phép gộp chung config (day_prefix, input, config chung...) rồi mỗi
+    hàm tự lấy đúng phần mình cần, không phải sửa chỗ gọi khi thêm/bớt tham số.
     """
-    logger.info(f"Start grouping data from {start_date} to {end_date}")
-    df = extract_data_by_date(start_date, end_date)
-
-    # Group data by month and save to minio
-    group_data_by_month(df)
+    sig_params = inspect.signature(func).parameters
+    kwargs = {k: v for k, v in candidate_kwargs.items() if k in sig_params}
+    return func(*args, **kwargs)
 
 
-@with_config("rules.yaml")
-def main_transform_data(df, config=None, scoring_month=None) -> pd.DataFrame:
-    """Transform raw data to feature data by applying rule-based transformations.
+def run_feature_day(day_feature: str, dt_from: str, dt_to: str) -> None:
+    """Giai đoạn ngày: chạy day_function cho từng ngày trong [dt_from, dt_to].
 
-    Args:
-        df (pd.DataFrame): Raw data to be transformed.
-        config (dict): Configuration for the transformation.
-        scoring_month (str): Scoring month.
-
-    Returns:
-        pd.DataFrame: Transformed data.
+    day_function tự đọc raw, tự làm sạch, tự lưu — ở đây chỉ tra config rồi
+    lặp qua từng ngày gọi, không phụ thuộc feature/ngày khác.
     """
-    logger.info("Start transform data")
-    df_age = transform_nam_tuoi(df, "nam_tuoi", config=config)
-    df_usage_duration_months = transform_usage_duration_months(
-        df, "so_thang_hdong", config=config
-    )
-    df_sales_region = transform_sales_region(
-        df, "ma_tinh_hoatdong_chinh", config=config
-    )
-    df_avg_success_order_value_per_month = (
-        transform_avg_success_order_value_per_month(
-            df, "tong_tien", config=config
+    feature_cfg = _get_day_feature_config(day_feature)
+    module = importlib.import_module(feature_cfg["module"])
+    func = getattr(module, feature_cfg["day_function"])
+
+    candidate_kwargs = {
+        "day_prefix": feature_cfg.get("day_prefix"),
+        **_get_global_config(),
+    }
+
+    current_date = datetime.strptime(dt_from, "%Y%m%d")
+    end_date = datetime.strptime(dt_to, "%Y%m%d")
+    while current_date <= end_date:
+        date_str = current_date.strftime("%Y%m%d")
+        logger.info(f"Start day-feature '{day_feature}' for date={date_str}")
+        _call_with_declared_kwargs(func, date_str, **candidate_kwargs)
+        current_date += timedelta(days=1)
+
+
+def run_feature(feature_name: str, month: str) -> None:
+    """Giai đoạn tháng (có window): chạy 1 rule instance theo config.
+
+    function tự load N tháng dữ liệu ngày đã clean, tự tính, tự lưu — ở đây
+    chỉ tra config rồi gọi.
+    """
+    feature_cfg = _get_feature_config(feature_name)
+    module = importlib.import_module(feature_cfg["module"])
+    func = getattr(module, feature_cfg["function"])
+
+    candidate_kwargs = {
+        "day_prefix": feature_cfg.get("day_prefix"),
+        "month_prefix": feature_cfg.get("month_prefix"),
+        **feature_cfg.get("input", {}),
+        **_get_global_config(),
+    }
+
+    logger.info(f"Start feature '{feature_name}' for month={month}")
+    _call_with_declared_kwargs(func, month, **candidate_kwargs)
+    logger.info(f"Feature '{feature_name}' completed")
+
+
+def _months_to_score(dt_from: str, dt_to: str) -> list[str]:
+    """Các tháng (YYYYMM) cần tính trong khoảng [dt_from, dt_to].
+
+    Pipeline chạy hàng ngày, xử lý theo ngày; mỗi khi gặp ngày đầu tháng thì
+    tháng LIỀN TRƯỚC ngày đó coi như đã đủ dữ liệu cả tháng nên cần tính.
+    Ví dụ dt_from=20251201, dt_to=20260308 gặp 4 ngày đầu tháng
+    (20251201, 20260101, 20260201, 20260301) -> cần tính 4 tháng
+    (202511, 202512, 202601, 202602).
+    """
+    current_date = datetime.strptime(dt_from, "%Y%m%d")
+    end_date = datetime.strptime(dt_to, "%Y%m%d")
+
+    months = []
+    while current_date <= end_date:
+        if current_date.day == 1:
+            prev_month_date = current_date - timedelta(days=1)
+            months.append(prev_month_date.strftime("%Y%m"))
+        current_date += timedelta(days=1)
+    return months
+
+
+def run_feature_range(feature_name: str, dt_from: str, dt_to: str) -> None:
+    """Chạy giai đoạn tháng cho MỌI tháng cần tính trong [dt_from, dt_to].
+
+    Dùng cho DAG chạy hàng ngày: đa số ngày sẽ không có tháng nào cần tính
+    (danh sách rỗng, không làm gì); chỉ ngày đầu tháng mới có 1 tháng cần
+    tính (tháng liền trước) — hoặc nhiều tháng hơn nếu chạy backfill 1
+    khoảng ngày dài.
+    """
+    months = _months_to_score(dt_from, dt_to)
+    if not months:
+        logger.info(
+            f"Không có tháng nào cần tính cho feature '{feature_name}' "
+            f"trong [{dt_from}, {dt_to}]"
         )
-    )
-    df_total_success_order_value_per_month = (
-        transform_total_success_order_value_per_month(
-            df, "tong_tien", config=config
-        )
-    )
-    df_avg_success_order_count_per_month = (
-        transform_avg_success_order_count_per_month(
-            df, "don_ptc", config=config
-        )
-    )
-    df_revenue_decline_last_n_quarters = (
-        transform_revenue_decline_last_n_quarters(
-            df, "tong_tien", config=config, scoring_month=scoring_month
-        )
-    )
-    df_transform_revenue_decline_last_n_months = (
-        transform_revenue_decline_last_n_months(df, "tong_tien", config=config)
-    )
-    df_total_success_order = transform_total_success_order(
-        df, "tong_tien", config=config
-    )
-    df_success_ord_all_months = transform_success_order_all_months(
-        df, "don_ptc", config=config
-    )
-    df_gmv_12th = transform_gmv_12th(df, config=config)
-    df_gmv_3th = transform_gmv_3th(df, config=config)
+        return
 
-    # Join tất cả các dataframe lại theo cus_id
-    result_df = (
-        df_age
-        .merge(df_usage_duration_months, on="cus_id", how="outer")
-        .merge(df_sales_region, on="cus_id", how="outer")
-        .merge(df_avg_success_order_value_per_month, on="cus_id", how="outer")
-        .merge(df_total_success_order_value_per_month, on="cus_id", how="outer")
-        .merge(df_avg_success_order_count_per_month, on="cus_id", how="outer")
-        .merge(df_revenue_decline_last_n_quarters, on="cus_id", how="outer")
-        .merge(df_total_success_order, on="cus_id", how="outer")
-        .merge(
-            df_transform_revenue_decline_last_n_months, on="cus_id", how="outer"
-        )
-        .merge(df_success_ord_all_months, on="cus_id", how="outer")
-        .merge(df_gmv_12th, on="cus_id", how="outer")
-        .merge(df_gmv_3th, on="cus_id", how="outer")
+    for month in months:
+        run_feature(feature_name, month)
+
+
+def merge_features_for_month(month: str) -> pd.DataFrame:
+    """Ghép kết quả giai đoạn tháng của MỌI feature trong 1 tháng lại theo
+    cus_id, lưu xuống `merged_prefix`/`month_partition_key`={month}/.
+    """
+    global_cfg = _get_global_config()
+    month_partition_key = global_cfg["month_partition_key"]
+
+    feature_dfs = []
+    for feature_cfg in load_config(FEATURES_CONFIG_FILE)["features"]:
+        prefix = f"{feature_cfg['month_prefix']}/{month_partition_key}={month}"
+        feature_dfs.append(read_minio_parquet(prefix))
+
+    merged_df = reduce(
+        lambda left, right: left.merge(right, on="cus_id", how="outer"),
+        feature_dfs,
     )
 
-    # Điền null cho các cột score
-    # Với các cột score_1, score_2, score_5 số thì ta sẽ thay null là 010 với
-    # 01: dành cho số 0, flat là 0
-    result_df["score_1"] = result_df["score_1"].fillna("010")
-    result_df["score_2"] = result_df["score_2"].fillna("010")
-    result_df["score_5"] = result_df["score_5"].fillna("010")
-    result_df["score_3"] = result_df["score_3"].fillna("0")
-    result_df["score_4"] = result_df["score_4"].fillna("0001")
-
-    # Với null (các cột boolean thôi) thì ta sẽ fill = 0
-    result_df = result_df.fillna(0)
-
-    # Đổi lại thành user_id cho đồng bộ
-    result_df = result_df.rename(columns={"cus_id": "user_id"})
-
-    # Sửa lỗi user_id bị .0 nếu còn xảy ra, UNCOMMENT dòng này nếu như không bị nữa nhé
-    # result_df["user_id"] = result_df["user_id"].replace(r'\.0$', '', regex=True)
-
-    # Tính score
-    # result_df["behavior_score"] = "0." + result_df["score_1"] + result_df["score_5"]
-    # result_df["gvm_score"] = "0." + result_df["score_2"] + result_df["score_3"] + result_df["score_4"]
-
-    # result_df["trend_score"] = (
-    #     result_df["score_6"]
-    #     .astype(str)
-    #     .str.cat(result_df["score_7"].astype(str))
-    #     .radd("0.")
-    # )
-    result_df = result_df.drop(["total_success_order_value_per_month"], axis=1)
-    result_df = result_df.rename(
-        columns={
-            "gmv_12th": "gvm_score",
-            "gmv_3th": "trend_score",
-            "usage_duration_group": "behavior_score",
-            "success_order_all_months": "total_success_order_value_per_month",
-        }
+    save_to_minio(
+        merged_df,
+        object_name=(
+            f"{global_cfg['merged_prefix']}/{month_partition_key}={month}/data.parquet"
+        ),
     )
-
-    # Assign cac column ma rule v2 khong dung nua ve 0 de de phan biet
-    for col in [
-        "avg_success_order_count_per_month",
-        "avg_success_order_value_per_month",
-        "revenue_decline_last_3_quarters",
-        "revenue_decline_last_4_months",
-    ]:
-        result_df[col] = 0
-
-    # Xóa đi các cột score thừa
-    result_df = result_df[result_df.gvm_score >= 100]
-    result_df = result_df.drop(
-        columns=[
-            "score_1",
-            "score_2",
-            "score_3",
-            "score_4",
-            "score_5",
-            "score_6",
-            "score_7",
-        ]
-    )  # "behavior_score", "gvm_score", "trend_score"
-
-    # Khong dung score col + age de danh gia
-    recommend_columns = [
-        "sales_region",
-        "usage_duration_months",
-        "total_success_order_value_per_month",
-    ]
-    result_df["recommendation"] = (
-        (result_df[recommend_columns] == 1).all(axis=1).astype(int)
-    )
-
-    # Tạm thời fake các cột sau
-    result_df["score"] = "0"
-    result_df["rule_score"] = np.random.randint(0, 2, size=result_df.shape[0])
-    result_df["phone"] = "09" + result_df["user_id"].astype(
-        str
-    )  # tạm thời là lấy 0 + user_id
-    result_df["date"] = datetime.now().strftime("%Y-%m-%d")
-    result_df["model_version"] = "v2.0.0"
-
-    return result_df
+    return merged_df
 
 
-def main_pipeline_scoring(scoring_month):
-    # Extract data
-    df = extract_scoring_data(scoring_month)
+def run_merge_range(dt_from: str, dt_to: str) -> None:
+    """Ghép feature cho MỌI tháng cần tính trong [dt_from, dt_to] (giống
+    danh sách tháng mà run_feature_range đã tính ở giai đoạn tháng).
+    """
+    months = _months_to_score(dt_from, dt_to)
+    if not months:
+        logger.info(f"Không có tháng nào cần ghép trong [{dt_from}, {dt_to}]")
+        return
 
-    # Transform data
-    df = main_transform_data(df, scoring_month=scoring_month)
-
-    # Load data
-    load_data_to_minio(df, scoring_month=scoring_month)
-    load_data_to_postgres(df)
+    for month in months:
+        logger.info(f"Start merge features for month={month}")
+        merge_features_for_month(month)
+        logger.info(f"Merge features completed for month={month}")
 
 
 if __name__ == "__main__":
@@ -262,58 +190,44 @@ if __name__ == "__main__":
     args_string = " ".join(sys.argv[1:])
     logger.info("Processing arguments...")
 
-    # Xử lý tham số
     args = utils.process_args_to_dict(args_string)
-    start_date_str = args["dt_from"]
-    end_date_str = args["dt_to"]
     logger.info("Parsed ARGS in run_create_feature: %s", args)
 
-    # Chuyển tham số sang dạng datetime
-    start_date = datetime.strptime(start_date_str, "%Y%m%d")
-    end_date = datetime.strptime(end_date_str, "%Y%m%d")
+    mode = args.get("mode")
 
-    # Xử lý theo ngày
-    logger.info(f"Start pipeline day from {start_date} to {end_date}")
-    current_date = start_date
-    while current_date <= end_date:
-        date_str = current_date.strftime("%Y%m%d")
-        main_pipeline_by_day(date_str)
-        current_date += timedelta(days=1)
-
-    # Xử lý theo tháng - chỉ chạy các tháng có đủ dữ liệu
-    current_month = start_date.replace(day=1)  # => datetime format %Y%m01
-    while current_month <= end_date:
-        # Tính ngày cuối tháng
-        if current_month.month == 12:
-            next_month = current_month.replace(
-                year=current_month.year + 1, month=1
+    if mode == "feature_day":
+        day_feature = args.get("day_feature")
+        dt_from = args.get("dt_from")
+        dt_to = args.get("dt_to")
+        if not day_feature or not dt_from or not dt_to:
+            raise ValueError(
+                "--day_feature, --dt_from và --dt_to là bắt buộc khi "
+                "--mode feature_day"
             )
-        else:
-            next_month = current_month.replace(month=current_month.month + 1)
-        month_end = next_month - timedelta(days=1)
+        run_feature_day(day_feature, dt_from, dt_to)
 
-        # Chỉ chạy nếu end_date >= ngày cuối tháng (đủ dữ liệu cả tháng)
-        if end_date >= month_end:
-            logger.info(
-                f"Processing month: {current_month.strftime('%Y%m')} "
-                f"({current_month.strftime('%Y%m%d')} -> "
-                f"{month_end.strftime('%Y%m%d')})"
+    elif mode == "feature":
+        feature_name = args.get("feature_name")
+        dt_from = args.get("dt_from")
+        dt_to = args.get("dt_to")
+        if not feature_name or not dt_from or not dt_to:
+            raise ValueError(
+                "--feature_name, --dt_from và --dt_to là bắt buộc khi "
+                "--mode feature"
             )
-            main_pipeline_by_month(
-                current_month.strftime("%Y%m%d"),
-                month_end.strftime("%Y%m%d"),
-            )
-        else:
-            logger.info(
-                f"Skipping month: {current_month.strftime('%Y%m')} "
-                f"(chưa đủ dữ liệu, end_date="
-                f"{end_date.strftime('%Y%m%d')} < "
-                f"{month_end.strftime('%Y%m%d')})"
-            )
+        run_feature_range(feature_name, dt_from, dt_to)
 
-        current_month = next_month
+    elif mode == "merge":
+        dt_from = args.get("dt_from")
+        dt_to = args.get("dt_to")
+        if not dt_from or not dt_to:
+            raise ValueError(
+                "--dt_from và --dt_to là bắt buộc khi --mode merge"
+            )
+        run_merge_range(dt_from, dt_to)
 
-    # Tính toán scoring
-    scoring_month = args.get("scoring_month")
-    if scoring_month:
-        main_pipeline_scoring(scoring_month)
+    else:
+        raise ValueError(
+            f"--mode không hợp lệ: '{mode}' (chỉ nhận feature_day, feature "
+            "hoặc merge)"
+        )

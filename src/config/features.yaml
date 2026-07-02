@@ -1,0 +1,63 @@
+# Config điều phối feature trong src/data_processing/transform.
+#
+# CHỈ dùng file này để cấu hình — mọi hằng số hay thay đổi (đường dẫn lưu
+# trên MinIO, tên cột partition, ngưỡng, window,...) đều khai báo ở đây,
+# không hardcode trong code Python. run.py tự đọc file này, gộp giá trị lại
+# rồi gọi hàm — hàm nào cần gì thì tự khai báo tham số đó, không tự đọc
+# config lấy thêm gì khác.
+#
+# - config: áp dụng chung cho MỌI feature (đường dẫn raw, tên cột partition).
+# - features: 1 entry là 1 "rule instance". Ví dụ: "order" (2 biến thể
+#   window l3m/l6m). Mỗi feature có 2 hàm, cùng nằm trong 1 module (file .py):
+#     - day_function: đọc raw 1 ngày, làm sạch, tự lưu xuống `day_prefix`.
+#     - function: đọc N tháng dữ liệu ngày đã clean (months_window), tính
+#       toán, tự lưu xuống `month_prefix`.
+#   - day_feature: tên "gốc" ở giai đoạn ngày — nhiều rule instance dùng
+#     chung 1 day_function/day_prefix (chỉ khác window ở giai đoạn tháng)
+#     thì khai báo cùng day_feature để không chạy/lưu trùng lặp.
+#   - day_prefix / month_prefix: thư mục (không tính bucket) lưu kết quả
+#     giai đoạn ngày / giai đoạn tháng trên MinIO.
+#   - input: kwargs khác truyền vào `function` (ngoài `month`).
+
+config:
+  raw_day_prefix: raw/hitech_day # nơi lưu raw theo ngày trên MinIO
+  day_partition_key: partition_date # tên cột partition theo ngày
+  month_partition_key: partition # tên cột partition theo tháng
+  merged_prefix: clean/merged # nơi lưu kết quả đã ghép tất cả feature theo tháng
+
+features:
+  - name: order_l3m
+    module: src.data_processing.transform.order
+    day_feature: order
+    day_function: transform_order_by_day
+    function: transform_order_lxm
+    day_prefix: clean/fts/order/day
+    month_prefix: clean/fts/order/month_l3m
+    input:
+      months_window: 3
+      min_count: 10 # số đơn hàng thành công trung bình/tháng >= 10
+      min_value: 10000000 # tổng giá trị đơn hàng thành công trung bình tháng >= 10tr
+
+  - name: order_l6m
+    module: src.data_processing.transform.order
+    day_feature: order
+    day_function: transform_order_by_day
+    function: transform_order_lxm
+    day_prefix: clean/fts/order/day
+    month_prefix: clean/fts/order/month_l6m
+    input:
+      months_window: 6
+      min_count: 10 # số đơn hàng thành công trung bình/tháng >= 10
+      min_value: 10000000 # tổng giá trị đơn hàng thành công trung bình tháng >= 10tr
+
+  - name: age_l12m
+    module: src.data_processing.transform.age
+    day_feature: age
+    day_function: transform_age_by_day
+    function: transform_age_lxm
+    day_prefix: clean/fts/age/day
+    month_prefix: clean/fts/age/month_l12m
+    input:
+      months_window: 12
+      min_age: 20
+      max_age: 50

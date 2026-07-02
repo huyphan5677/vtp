@@ -10,41 +10,32 @@ from src.utils.minio_client import (
 )
 
 
-# Giới hạn timestamp hợp lệ, ví dụ: 1e12 tương ứng với ngày 1/1/2050
-MAX_TIMESTAMP = 1e12
-
-
-def transform_age_by_day(
+def transform_order_by_day(
     date: str,
     day_prefix: str,
     raw_day_prefix: str,
     day_partition_key: str,
 ) -> pd.DataFrame:
-    """Giai đoạn ngày: đọc raw ngày `date` từ MinIO, tính tuổi từ ngày sinh,
-    lưu xuống `day_prefix`/`day_partition_key`={date}/.
+    """Giai đoạn ngày: đọc raw ngày `date` từ MinIO, làm sạch, lưu xuống
+    `day_prefix`/`day_partition_key`={date}/.
 
     day_prefix, raw_day_prefix, day_partition_key đều lấy từ features.yaml.
 
-    -> trả về dữ liệu ngày đã làm sạch, 2 cột: cus_id, age_years
+    -> trả về dữ liệu ngày đã làm sạch, 3 cột: cus_id, count, value
     """
     # 1, Đọc dữ liệu raw theo ngày
     raw_df = extract_data_by_date(
         date, prefix=raw_day_prefix, day_partition_key=day_partition_key
     )
 
-    # 2, Làm sạch dữ liệu: chỉ giữ cus_id, ngay_sinh; bỏ dòng cus_id null;
-    #    tính tuổi (age_years) từ ngày sinh
-    clean_df = raw_df[["cus_id", "ngay_sinh"]].copy()
+    # 2, Làm sạch dữ liệu: chỉ giữ cus_id, don_ptc, tong_tien; bỏ dòng cus_id null;
+    #    đổi tên don_ptc -> count, tong_tien -> value
+    clean_df = raw_df[["cus_id", "don_ptc", "tong_tien"]].copy()
     clean_df = clean_df.dropna(subset=["cus_id"])
     clean_df["cus_id"] = clean_df["cus_id"].astype(str)
-
-    dob = pd.to_numeric(clean_df["ngay_sinh"], errors="coerce")
-    dob = dob.apply(lambda x: x if x < MAX_TIMESTAMP else None)
-    dob = pd.to_datetime(dob, unit="ms", errors="coerce")
-
-    today = pd.Timestamp.today()
-    clean_df["age_years"] = (today - dob).dt.days / 365.25
-    clean_df = clean_df[["cus_id", "age_years"]]
+    clean_df = clean_df.rename(
+        columns={"don_ptc": "count", "tong_tien": "value"}
+    )
 
     # 3, Lưu dữ liệu đã làm sạch xuống MinIO
     save_to_minio(
@@ -54,23 +45,24 @@ def transform_age_by_day(
     return clean_df
 
 
-def transform_age_lxm(
+def transform_order_lxm(
     month: str,
     months_window: int,
-    min_age: float,
-    max_age: float,
+    min_count: float,
+    min_value: float,
     day_prefix: str,
     month_prefix: str,
     day_partition_key: str,
     month_partition_key: str,
 ) -> pd.DataFrame:
     """Giai đoạn tháng (có window): tự load `months_window` tháng dữ liệu
-    ngày đã clean (`day_prefix`), lấy tuổi lớn nhất theo cus_id, so với
-    khoảng [min_age, max_age], và tự lưu xuống `month_prefix`.
+    ngày đã clean (`day_prefix`), tính avg count/value theo cus_id, so với
+    ngưỡng min_count/min_value, và tự lưu xuống `month_prefix`.
 
     Tất cả tham số đều lấy từ features.yaml.
 
-    -> trả về bảng gồm cus_id, f_age_l{N}m, f_age_ok_l{N}m
+    -> trả về bảng gồm cus_id, f_order_avg_count_l{N}m, f_order_avg_value_l{N}m,
+       f_order_count_ok_l{N}m, f_order_value_ok_l{N}m
     """
     # 1, Xác định khoảng ngày cần load: từ đầu tháng (month - months_window + 1)
     #    đến cuối tháng (month)
@@ -87,24 +79,37 @@ def transform_age_lxm(
         prefix=day_prefix,
         day_partition_key=day_partition_key,
     )
+    day_df["month"] = day_df[day_partition_key].astype(str).str[:6].astype(int)
 
-    # 3, Lấy tuổi lớn nhất theo cus_id, đánh dấu có nằm trong khoảng hợp lệ
-    age_col = f"f_age_l{months_window}m"
-    age_ok_col = f"f_age_ok_l{months_window}m"
+    # 3, Tính avg count/value theo cus_id, và đánh dấu đạt ngưỡng hay không
+    count_col = f"f_order_avg_count_l{months_window}m"
+    value_col = f"f_order_avg_value_l{months_window}m"
+    count_ok_col = f"f_order_count_ok_l{months_window}m"
+    value_ok_col = f"f_order_value_ok_l{months_window}m"
 
     result_df = (
         day_df
         .groupby("cus_id")
-        .agg(**{age_col: ("age_years", "max")})
+        .agg(
+            **{count_col: ("count", "mean"), value_col: ("value", "mean")},
+            active_months=("month", "nunique"),
+        )
         .reset_index()
     )
 
-    result_df[age_ok_col] = (
-        (result_df[age_col] >= min_age) & (result_df[age_col] <= max_age)
+    # Đạt ngưỡng chỉ khi >= min VÀ có đủ dữ liệu cả months_window tháng
+    has_full_window = result_df["active_months"] == months_window
+    result_df[count_ok_col] = (
+        (result_df[count_col] >= min_count) & has_full_window
+    ).astype(int)
+    result_df[value_ok_col] = (
+        (result_df[value_col] >= min_value) & has_full_window
     ).astype(int)
 
     # 4, Chỉ giữ các cột cần thiết
-    result_df = result_df[["cus_id", age_col, age_ok_col]]
+    result_df = result_df[
+        ["cus_id", count_col, value_col, count_ok_col, value_ok_col]
+    ]
 
     # 5, Lưu dữ liệu đã làm sạch xuống.
     save_to_minio(
