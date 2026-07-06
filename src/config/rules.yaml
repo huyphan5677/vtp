@@ -1,0 +1,100 @@
+model_version: v1.0.0
+
+age:
+  min: 20
+  max: 50
+
+sales_region:
+  valid:
+    - DNI  # Đồng Nai
+    - HNI  # Hà Nội
+    - HCM  # TP. Hồ Chí Minh
+    - PHO  # Phú Thọ
+    - LCI  # Lào Cai
+    - AGG  # An Giang
+    - VLG  # Vĩnh Long
+    - LAN  # Long An
+    - QNM  # Quảng Nam
+    - THA  # Thanh Hóa
+    - HDG  # Hải Dương
+    - DNG  # Đà Nẵng
+    - CTO  # Cần Thơ
+    - HYN  # Hưng Yên
+    - HGG  # Hà Giang
+    - QBH  # Quảng Bình
+    - HTH  # Hà Tĩnh
+    - TBH  # Thái Bình
+    - TGG  # Tiền Giang
+    - KHA  # Khánh Hòa
+    - CBG  # Cao Bằng
+    # - QNI  # Quảng Ninh
+    - TVH  # Trà Vinh
+    - NAN  # Nghệ An
+    - VTU  # Bà Rịa - Vũng Tàu
+    - BKN  # Bắc Kạn
+    - LDG  # Lâm Đồng
+    - BLU  # Bạc Liêu
+    - VPC  # Vĩnh Phúc
+    - HBH  # Hòa Bình
+    - HNM  # Hà Nam
+    - HUE  # Thừa Thiên Huế
+    - BGG  # Bắc Giang
+    - KGG  # Kiên Giang
+    - LSN  # Lạng Sơn
+    - QTI  # Quảng Trị
+    - BPC  # Bình Phước
+    - NDH  # Nam Định
+    - BTN  # Bình Thuận
+    - DTP  # Đồng Tháp
+    - NBH  # Ninh Bình
+    - NTN  # Ninh Thuận
+    - PYN  # Phú Yên
+    - BDG  # Bình Dương
+    - BDH  # Bình Định
+    # - HPG  # Hải Phòng
+    - BNH  # Bắc Ninh
+    - TNN  # Thái Nguyên
+    - QNG  # Quảng Ngãi
+    # - GLI  # Gia Lai
+    # - KTU  # Kon Tum
+    # - DLI  # Đắk Lắk
+    # - DNO  # Đắk Nông
+    # - DBN  # Điện Biên
+    # - LCH  # Lai Châu
+    # - SLA  # Sơn La
+    # - TQG  # Tuyên Quang
+    # - YBI  # Yên Bái
+    # - TNI  # Tây Ninh
+    # - STG  # Sóc Trăng
+    # - BTR  # Bến Tre
+    # - CMU  # Cà Mau
+    - HGI  # Hậu Giang
+usage_duration_months:
+  min: 4
+
+avg_success_order_value_per_month:
+  min: 10000000
+  months_window: 6
+
+total_success_order_value_per_month:
+  min: 3000000
+  months_window: 6
+
+avg_success_order_count_per_month:
+  min: 10
+  months_window: 6
+
+revenue_decline_last_4_months:
+  max_consecutive_decline: 3
+  decline_pct: 0.2
+  months_window: 6
+
+revenue_decline_last_3_quarters:
+  max_consecutive_decline: 2
+  decline_pct: 0.3
+
+total_success_order:
+  min: 12
+
+success_order_all_months:
+  months_window: 4

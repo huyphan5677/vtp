@@ -61,3 +61,54 @@ features:
       months_window: 12
       min_age: 20
       max_age: 50
+
+
+  - name: usage_duration_l12m
+    module: src.data_processing.transform.usage_duration
+    day_feature: usage_duration
+    day_function: transform_usage_duration_by_day
+    function: transform_usage_duration_lxm
+    day_prefix: clean/fts/usage_duration/day
+    month_prefix: clean/fts/usage_duration/month_l12m
+    input:
+      months_window: 12
+
+  - name: sales_region_l1m
+    module: src.data_processing.transform.sales_region
+    day_feature: sales_region
+    day_function: transform_sales_region_by_day
+    function: transform_sales_region_lxm
+    day_prefix: clean/fts/sales_region/day
+    month_prefix: clean/fts/sales_region/month_l1m
+    input:
+      months_window: 1
+
+  - name: success_order_all_months_l4m
+    module: src.data_processing.transform.success_order
+    day_feature: success_order_all_months
+    day_function: transform_success_order_by_day
+    function: transform_success_order_lxm
+    day_prefix: clean/fts/success_order_all_months/day
+    month_prefix: clean/fts/success_order_all_months/month_l4m
+    input:
+      months_window: 4
+
+  - name: gmv_l12m
+    module: src.data_processing.transform.gmv
+    day_feature: gmv
+    day_function: transform_gmv_by_day
+    function: transform_gmv_lxm
+    day_prefix: clean/fts/gmv/day
+    month_prefix: clean/fts/gmv/month_l12m
+    input:
+      months_window: 12
+
+  - name: recommendation_l1m
+    module: src.data_processing.transform.recommendation
+    day_feature: recommendation
+    day_function: transform_recommendation_by_day
+    function: transform_recommendation_lxm
+    day_prefix: clean/fts/recommendation/day
+    month_prefix: clean/fts/recommendation/month_l1m
+    input:
+      months_window: 1
