@@ -50,7 +50,7 @@ features:
       min_count: 10 # số đơn hàng thành công trung bình/tháng >= 10
       min_value: 10000000 # tổng giá trị đơn hàng thành công trung bình tháng >= 10tr
 
-  - name: age_l12m
+  - name: age_l12m #done
     module: src.data_processing.transform.age
     day_feature: age
     day_function: transform_age_by_day
@@ -73,15 +73,15 @@ features:
     input:
       months_window: 12
 
-  - name: sales_region_l1m
+  - name: sales_region_l12m #done
     module: src.data_processing.transform.sales_region
     day_feature: sales_region
     day_function: transform_sales_region_by_day
     function: transform_sales_region_lxm
     day_prefix: clean/fts/sales_region/day
-    month_prefix: clean/fts/sales_region/month_l1m
+    month_prefix: clean/fts/sales_region/month_l12m
     input:
-      months_window: 1
+      months_window: 12
 
   - name: success_order_all_months_l4m
     module: src.data_processing.transform.success_order
@@ -93,7 +93,7 @@ features:
     input:
       months_window: 4
 
-  - name: gmv_l12m
+  - name: gmv_l12m #done
     module: src.data_processing.transform.gmv
     day_feature: gmv
     day_function: transform_gmv_by_day
@@ -103,12 +103,12 @@ features:
     input:
       months_window: 12
 
-  - name: recommendation_l1m
-    module: src.data_processing.transform.recommendation
-    day_feature: recommendation
-    day_function: transform_recommendation_by_day
-    function: transform_recommendation_lxm
-    day_prefix: clean/fts/recommendation/day
-    month_prefix: clean/fts/recommendation/month_l1m
+  - name: gmv_l3m #done
+    module: src.data_processing.transform.gmv
+    day_feature: gmv
+    day_function: transform_gmv_by_day
+    function: transform_gmv_lxm
+    day_prefix: clean/fts/gmv/day
+    month_prefix: clean/fts/gmv/month_l3m
     input:
-      months_window: 1
+      months_window: 3

@@ -21,16 +21,20 @@ def transform_sales_region_by_day(
 
     day_prefix, raw_day_prefix, day_partition_key đều lấy từ features.yaml.
 
-    -> trả về dữ liệu ngày đã làm sạch, 2 cột: cus_id, ma_tinh_hoatdong_chinh
+    -> trả về dữ liệu ngày đã làm sạch, 2 cột: cus_id, sale_region
     """
     raw_df = extract_data_by_date(
         date, prefix=raw_day_prefix, day_partition_key=day_partition_key
     )
 
     clean_df = raw_df[["cus_id", "ma_tinh_hoatdong_chinh"]].copy()
+    clean_df = clean_df.rename(columns={"ma_tinh_hoatdong_chinh": "sale_region"})
     clean_df = clean_df.dropna(subset=["cus_id"])
-    clean_df["cus_id"] = clean_df["cus_id"].astype(str)
-    clean_df["month"] = date[:6]
+    clean_df["cus_id"] = (
+    clean_df["cus_id"].dropna()
+    .apply(lambda x: x.get("member0") if isinstance(x, dict) else x)
+    .astype(str)
+)
 
     save_to_minio(
         clean_df,
@@ -45,21 +49,15 @@ def transform_sales_region_lxm(
     day_prefix: str,
     month_prefix: str,
     day_partition_key: str,
-    month_partition_key: str,
+    month_partition_key: str
 ) -> pd.DataFrame:
     """Giai đoạn tháng (có window): tự load `months_window` tháng dữ liệu
     ngày đã clean (`day_prefix`), lấy bản ghi cuối cùng theo cus_id,
-    tạo signal thô `sales_region_value` cho tỉnh hợp lệ, rồi tự lưu xuống
+    tạo signal `sales_region_value` cho tỉnh hợp lệ, rồi tự lưu xuống
     `month_prefix`.
 
-    Lưu ý: transform chỉ tạo signal, ngưỡng/valid list sẽ được xử lý ở tầng
-    filter sau.
-
-    -> trả về bảng gồm cus_id, sales_region_value
+    -> trả về bảng gồm cus_id, f_sale_region_l{months_window}m
     """
-    rules_cfg = load_config("rules.yaml")
-    valid_regions = set(rules_cfg.get("sales_region", {}).get("valid", []))
-
     start_month = (pd.Period(month, freq="M") - months_window + 1).strftime(
         "%Y%m"
     )
@@ -73,17 +71,21 @@ def transform_sales_region_lxm(
         day_partition_key=day_partition_key,
     )
 
-    work = day_df[["cus_id", "month", "ma_tinh_hoatdong_chinh"]].copy()
-    work["ma_tinh_hoatdong_chinh"] = work["ma_tinh_hoatdong_chinh"].astype(str)
+    region_df = day_df[["cus_id", day_partition_key, "sale_region"]].copy()
+    region_df["sale_region"] = region_df["sale_region"].astype(str)
 
-    latest = (
-        work.sort_values(["cus_id", "month"], ascending=[True, True])
+    # Lấy bản ghi mới nhất
+    result_df = (
+        region_df
+        .sort_values(day_partition_key, ascending=False)
         .groupby("cus_id", as_index=False)
-        .tail(1)
+        .first()
     )
-    latest["sales_region_value"] = latest["ma_tinh_hoatdong_chinh"].isin(valid_regions).astype(int)
 
-    result_df = latest[["cus_id", "sales_region_value"]]
+    region_col = f"f_sale_region_l{months_window}m"
+
+    result_df = result_df[["cus_id", region_col]]
+
 
     save_to_minio(
         result_df,
