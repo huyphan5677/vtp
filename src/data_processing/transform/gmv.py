@@ -99,57 +99,59 @@ def transform_gmv_lxm(
         day_partition_key=day_partition_key,
     )
     day_df["month"] = day_df[day_partition_key].astype(str).str[:6].astype(int)
-    day_df = day_df[
-        [
-            "cus_id",
-            "month",
-            "count",
-            "value",
-            "thu_ho",
-            "thuho_tongdon",
-            "don_ptc_cod",
-            "tongdon_cod",
-            "tong_don",
-            "tong_cuoc_ptc"
-        ]
-    ].copy()
+    agg_dict = {
+    "count": "sum",
+    "value": "sum",
+    "tong_don": "sum",
+    "thu_ho": "sum",
+    "tong_cuoc_ptc": "sum",
+    "don_ptc_cod": "sum",
+    "thuho_tongdon": "sum",
+    "tongdon_cod": "sum",
+}
+
+    monthly_df = (
+        day_df
+        .groupby(["cus_id", "month"], as_index=False)
+        .agg(agg_dict)
+)
 
     # ----------------------------
     # ship_rev chung cho cả COD và Non-COD
     # ----------------------------
-    ship_rev = np.where(
-        (day_df["tong_don"] > 0) & (day_df["tong_don"].notna()),
-        day_df["count"] * day_df["value"] / day_df["tong_don"],
-        np.nan,
-    )
+    ship_rev = (
+        monthly_df["count"]
+        * monthly_df["value"]
+        / monthly_df["tong_don"].replace(0, np.nan)
+)
 
     # ----------------------------
     # Lọc dòng COD và Non-COD
     # ----------------------------
     cod_mask = (
-        (day_df["thu_ho"] > 0) | (day_df["thuho_tongdon"] > 0)
+        (monthly_df["thu_ho"] > 0) | (monthly_df["thuho_tongdon"] > 0)
     )
 
     # ----------------------------
     # avg_don
     # ----------------------------
     avg_don = np.where(
-        day_df["thu_ho"] > 0,
-        day_df["thu_ho"] / day_df["don_ptc_cod"].replace(0, np.nan),
-        day_df["thuho_tongdon"] / day_df["tongdon_cod"].replace(0, np.nan),
+        monthly_df["thu_ho"] > 0,
+        monthly_df["thu_ho"] / monthly_df["don_ptc_cod"].replace(0, np.nan),
+        monthly_df["thuho_tongdon"] / monthly_df["tongdon_cod"].replace(0, np.nan),
     )
 
     # ----------------------------
     # COD GMV
     # ----------------------------
-    gmv_cod = day_df["count"] * avg_don
+    gmv_cod = monthly_df["count"] * avg_don
 
     # ----------------------------
     # ship_rev_ratio
     # ----------------------------
     ship_rev_ratio = np.where(
-        day_df["tong_cuoc_ptc"] > 0,
-        day_df["tong_cuoc_ptc"] / gmv_cod,
+        monthly_df["tong_cuoc_ptc"] > 0,
+        monthly_df["tong_cuoc_ptc"] / gmv_cod,
         ship_rev / gmv_cod,
     )
 
@@ -158,6 +160,7 @@ def transform_gmv_lxm(
     # ----------------------------
     med_ratio = np.nanmedian(ship_rev_ratio[cod_mask])
 
+    # tránh trường hợp med_ratio = nan (tất cả dòng đều là Non-COD) thì set med_ratio = 1.0
     if np.isnan(med_ratio):
         med_ratio = 1.0
 
@@ -165,33 +168,27 @@ def transform_gmv_lxm(
     # Non-COD GMV
     # ----------------------------
     gmv_non = np.where(
-        day_df["tong_cuoc_ptc"] > 0,
-        day_df["tong_cuoc_ptc"] / med_ratio,
+        monthly_df["tong_cuoc_ptc"] > 0,
+        monthly_df["tong_cuoc_ptc"] / med_ratio,
         ship_rev / med_ratio,
     )
 
     # ----------------------------
     # GMV toàn bộ
     # ----------------------------
-    day_df["gmv"] = np.where(
+    monthly_df["gmv"] = np.where(
         cod_mask,
         gmv_cod,
         gmv_non,
     )
 
-    result_df = (
-        day_df.groupby("cus_id", as_index=False)
-        .agg(
-            **{
-                f"f_order_gmv_l{months_window}m": (
-                    "gmv",
-                    "sum",
-                )
-            }
-        )
-    )
-
     feature = f"f_order_gmv_l{months_window}m"
+
+    result_df = (
+    monthly_df
+    .groupby("cus_id", as_index=False)
+    .agg(**{feature: ("gmv", "sum")})
+)
 
     result_df[feature] = (
         result_df[feature]

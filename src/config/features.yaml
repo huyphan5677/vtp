@@ -26,7 +26,7 @@ config:
   merged_prefix: clean/merged # nơi lưu kết quả đã ghép tất cả feature theo tháng
 
 features:
-  - name: order_l3m
+  - name: order_l3m #done
     module: src.data_processing.transform.order
     day_feature: order
     day_function: transform_order_by_day
@@ -38,7 +38,7 @@ features:
       min_count: 10 # số đơn hàng thành công trung bình/tháng >= 10
       min_value: 10000000 # tổng giá trị đơn hàng thành công trung bình tháng >= 10tr
 
-  - name: order_l6m
+  - name: order_l6m #done
     module: src.data_processing.transform.order
     day_feature: order
     day_function: transform_order_by_day
@@ -49,6 +49,62 @@ features:
       months_window: 6
       min_count: 10 # số đơn hàng thành công trung bình/tháng >= 10
       min_value: 10000000 # tổng giá trị đơn hàng thành công trung bình tháng >= 10tr
+
+  - name: order_avg_count_bin_l3m
+    module: src.data_processing.transform.order
+    day_feature: order
+    day_function: transform_order_by_day
+    function: transform_order_avg_bin_lxm
+    day_prefix: clean/fts/order/day
+    month_prefix: clean/fts/order/avg_count_bin_l3m
+    input:
+      months_window: 3
+      n_bins: 20
+      metric_col: count
+      output_prefix: count
+
+  - name: order_avg_value_bin_l3m
+    module: src.data_processing.transform.order
+    day_feature: order
+    day_function: transform_order_by_day
+    function: transform_order_avg_bin_lxm
+    day_prefix: clean/fts/order/day
+    month_prefix: clean/fts/order/avg_value_bin_l3m
+    input:
+      months_window: 3
+      n_bins: 20
+      metric_col: value
+      output_prefix: value
+
+  - name: order_min_value_l6m
+    module: src.data_processing.transform.order
+    day_feature: order
+    day_function: transform_order_by_day
+    function: transform_order_value_summary_lxm
+    day_prefix: clean/fts/order/day
+    month_prefix: clean/fts/order/min_value_l6m
+    input:
+      months_window: 6
+
+  - name: order_sum_value_handy_l12m
+    module: src.data_processing.transform.order
+    day_feature: order
+    day_function: transform_order_by_day
+    function: transform_order_value_summary_lxm
+    day_prefix: clean/fts/order/day
+    month_prefix: clean/fts/order/sum_value_handy_l12m
+    input:
+      months_window: 12
+
+  - name: success_order_all_months_l4m
+    module: src.data_processing.transform.order
+    day_feature: order
+    day_function: transform_order_by_day
+    function: transform_success_order_all_months_lxm
+    day_prefix: clean/fts/order/day
+    month_prefix: clean/fts/order/success_order_all_months_l4m
+    input:
+      months_window: 4
 
   - name: age_l12m #done
     module: src.data_processing.transform.age
@@ -61,7 +117,6 @@ features:
       months_window: 12
       min_age: 20
       max_age: 50
-
 
   - name: usage_duration_l12m
     module: src.data_processing.transform.usage_duration
@@ -83,25 +138,25 @@ features:
     input:
       months_window: 12
 
-  - name: success_order_all_months_l4m
-    module: src.data_processing.transform.success_order
-    day_feature: success_order_all_months
-    day_function: transform_success_order_by_day
-    function: transform_success_order_lxm
-    day_prefix: clean/fts/success_order_all_months/day
-    month_prefix: clean/fts/success_order_all_months/month_l4m
+  - name: order_value_decline_streak_l6m
+    module: src.data_processing.transform.order
+    day_feature: order
+    day_function: transform_order_by_day
+    function: transform_order_value_decline_streak_lxm
+    day_prefix: clean/fts/order/day
+    month_prefix: clean/fts/order/value_decline_streak_l6m
     input:
-      months_window: 4
+      months_window: 6
 
-  - name: gmv_l12m #done
-    module: src.data_processing.transform.gmv
-    day_feature: gmv
-    day_function: transform_gmv_by_day
-    function: transform_gmv_lxm
-    day_prefix: clean/fts/gmv/day
-    month_prefix: clean/fts/gmv/month_l12m
+  - name: order_value_decline_streak_l3q
+    module: src.data_processing.transform.order
+    day_feature: order
+    day_function: transform_order_by_day
+    function: transform_order_value_decline_streak_lq
+    day_prefix: clean/fts/order/day
+    month_prefix: clean/fts/order/value_decline_streak_l3q
     input:
-      months_window: 12
+      quarters_window: 3
 
   - name: gmv_l3m #done
     module: src.data_processing.transform.gmv
@@ -112,3 +167,13 @@ features:
     month_prefix: clean/fts/gmv/month_l3m
     input:
       months_window: 3
+
+  - name: gmv_l12m #done
+    module: src.data_processing.transform.gmv
+    day_feature: gmv
+    day_function: transform_gmv_by_day
+    function: transform_gmv_lxm
+    day_prefix: clean/fts/gmv/day
+    month_prefix: clean/fts/gmv/month_l12m
+    input:
+      months_window: 12
