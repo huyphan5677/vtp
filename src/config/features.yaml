@@ -26,7 +26,7 @@ config:
   merged_prefix: clean/merged # nơi lưu kết quả đã ghép tất cả feature theo tháng
 
 features:
-  - name: order_l3m #done
+  - name: order_l3m
     module: src.data_processing.transform.order
     day_feature: order
     day_function: transform_order_by_day
@@ -38,7 +38,7 @@ features:
       min_count: 10 # số đơn hàng thành công trung bình/tháng >= 10
       min_value: 10000000 # tổng giá trị đơn hàng thành công trung bình tháng >= 10tr
 
-  - name: order_l6m #done
+  - name: order_l6m
     module: src.data_processing.transform.order
     day_feature: order
     day_function: transform_order_by_day
@@ -106,7 +106,7 @@ features:
     input:
       months_window: 4
 
-  - name: age_l12m #done
+  - name: age_l12m
     module: src.data_processing.transform.age
     day_feature: age
     day_function: transform_age_by_day
@@ -128,7 +128,7 @@ features:
     input:
       months_window: 12
 
-  - name: sales_region_l12m #done
+  - name: sales_region_l12m
     module: src.data_processing.transform.sales_region
     day_feature: sales_region
     day_function: transform_sales_region_by_day
@@ -158,7 +158,7 @@ features:
   #   input:
   #     quarters_window: 3
 
-  - name: gmv_l3m #done
+  - name: gmv_l3m
     module: src.data_processing.transform.gmv
     day_feature: gmv
     day_function: transform_gmv_by_day
@@ -168,7 +168,7 @@ features:
     input:
       months_window: 3
 
-  - name: gmv_l12m #done
+  - name: gmv_l12m
     module: src.data_processing.transform.gmv
     day_feature: gmv
     day_function: transform_gmv_by_day
