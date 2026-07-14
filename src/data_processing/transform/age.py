@@ -57,8 +57,8 @@ def transform_age_by_day(
 def transform_age_lxm(
     month: str,
     months_window: int,
-    min_age: float,
-    max_age: float,
+    # min_age: float,
+    # max_age: float,
     day_prefix: str,
     month_prefix: str,
     day_partition_key: str,
@@ -70,7 +70,7 @@ def transform_age_lxm(
 
     Tất cả tham số đều lấy từ features.yaml.
 
-    -> trả về bảng gồm cus_id, f_age_l{N}m, f_age_ok_l{N}m
+    -> trả về bảng gồm cus_id, f_age_l{N}m,
     """
     # 1, Xác định khoảng ngày cần load: từ đầu tháng (month - months_window + 1)
     #    đến cuối tháng (month)
@@ -90,7 +90,7 @@ def transform_age_lxm(
 
     # 3, Lấy tuổi lớn nhất theo cus_id, đánh dấu có nằm trong khoảng hợp lệ
     age_col = f"f_age_l{months_window}m"
-    age_ok_col = f"f_age_ok_l{months_window}m"
+    #age_ok_col = f"f_age_ok_l{months_window}m"
 
     result_df = (
         day_df
@@ -99,12 +99,12 @@ def transform_age_lxm(
         .reset_index()
     )
 
-    result_df[age_ok_col] = (
-        (result_df[age_col] >= min_age) & (result_df[age_col] <= max_age)
-    ).astype(int)
+    #result_df[age_ok_col] = (
+    #    (result_df[age_col] >= min_age) & (result_df[age_col] <= max_age)
+    #).astype(int)
 
     # 4, Chỉ giữ các cột cần thiết
-    result_df = result_df[["cus_id", age_col, age_ok_col]]
+    result_df = result_df[["cus_id", age_col]]
 
     # 5, Lưu dữ liệu đã làm sạch xuống.
     save_to_minio(

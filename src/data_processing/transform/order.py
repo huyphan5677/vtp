@@ -309,106 +309,106 @@ def transform_success_order_all_months_lxm(
     return result_df
 
 
-def transform_order_value_decline_streak_lq(
-    month: str,
-    quarters_window: int,
-    day_prefix: str,
-    month_prefix: str,
-    day_partition_key: str,
-    month_partition_key: str,
-) -> pd.DataFrame:
+# def transform_order_value_decline_streak_lq(
+#     month: str,
+#     quarters_window: int,
+#     day_prefix: str,
+#     month_prefix: str,
+#     day_partition_key: str,
+#     month_partition_key: str,
+# ) -> pd.DataFrame:
 
-    """
-    Đếm số quý giảm doanh thu liên tục.
+#     """
+#     Đếm số quý giảm doanh thu liên tục.
 
-    Logic:
-    - Tổng value theo quý
-    - Xét N quý gần nhất (không tính quý hiện tại)
-    - Giảm >=30% so với quý trước
-    - Tính streak dài nhất
+#     Logic:
+#     - Tổng value theo quý
+#     - Xét N quý gần nhất (không tính quý hiện tại)
+#     - Giảm >=30% so với quý trước
+#     - Tính streak dài nhất
 
-    Trả về: cus_id, f_order_value_decline_streak_l{N}q
-    """
-    scoring_period = pd.Period(month, freq="M")
+#     Trả về: cus_id, f_order_value_decline_streak_l{N}q
+#     """
+#     scoring_period = pd.Period(month, freq="M")
 
-    # bỏ quý hiện tại
-    end_quarter = (scoring_period.asfreq("Q", how="start")- 1)
+#     # bỏ quý hiện tại
+#     end_quarter = (scoring_period.asfreq("Q", how="start")- 1)
 
-    start_quarter = (end_quarter - quarters_window + 1)
+#     start_quarter = (end_quarter - quarters_window + 1)
 
-    start_date = (start_quarter.start_time)
-    end_date = (end_quarter.end_time)
-
-
-    day_df = extract_data_by_range(
-        start_date.strftime("%Y%m%d"),
-        end_date.strftime("%Y%m%d"),
-        prefix=day_prefix,
-        day_partition_key=day_partition_key,
-    )
-
-    day_df["month"] = (day_df[day_partition_key].astype(str).str[:6].astype(int))
-
-    day_df["quarter"] = (pd.to_datetime(day_df["month"], format="%Y%m").dt.to_period("Q"))
+#     start_date = (start_quarter.start_time)
+#     end_date = (end_quarter.end_time)
 
 
-    # Tổng doanh thu theo quý
-    quarter_df = (
-        day_df
-        .groupby(["cus_id","quarter"], as_index=False)
-        .agg(quarterly_value=("value","sum"))
-    )
+#     day_df = extract_data_by_range(
+#         start_date.strftime("%Y%m%d"),
+#         end_date.strftime("%Y%m%d"),
+#         prefix=day_prefix,
+#         day_partition_key=day_partition_key,
+#     )
 
-    # sắp xếp theo thời gian
-    quarter_df = quarter_df.sort_values(["cus_id", "quarter"])
+#     day_df["month"] = (day_df[day_partition_key].astype(str).str[:6].astype(int))
 
-    # quý trước
-    quarter_df["prev_value"] = (
-        quarter_df
-        .groupby("cus_id")["quarterly_value"]
-        .shift(1)
-    )
-
-    # giảm >=30%
-    quarter_df["is_decline"] = (
-        quarter_df["quarterly_value"]
-        /
-        quarter_df["prev_value"]
-        -
-        1
-    ) <= -0.3
+#     day_df["quarter"] = (pd.to_datetime(day_df["month"], format="%Y%m").dt.to_period("Q"))
 
 
-    def max_streak(x):
-        groups = (
-            x != x.shift()
-        ).cumsum()
+#     # Tổng doanh thu theo quý
+#     quarter_df = (
+#         day_df
+#         .groupby(["cus_id","quarter"], as_index=False)
+#         .agg(quarterly_value=("value","sum"))
+#     )
 
-        return (
-            x
-            .groupby(groups)
-            .cumsum()
-            .max()
-        )
+#     # sắp xếp theo thời gian
+#     quarter_df = quarter_df.sort_values(["cus_id", "quarter"])
 
-    feature_col = f"f_order_value_decline_streak_l{quarters_window}q"
+#     # quý trước
+#     quarter_df["prev_value"] = (
+#         quarter_df
+#         .groupby("cus_id")["quarterly_value"]
+#         .shift(1)
+#     )
+
+#     # giảm >=30%
+#     quarter_df["is_decline"] = (
+#         quarter_df["quarterly_value"]
+#         /
+#         quarter_df["prev_value"]
+#         -
+#         1
+#     ) <= -0.3
 
 
-    result_df = (
-        quarter_df
-        .groupby("cus_id")["is_decline"]
-        .apply(max_streak)
-        .fillna(0)
-        .astype(int)
-        .reset_index(name=feature_col)
-    )
+#     def max_streak(x):
+#         groups = (
+#             x != x.shift()
+#         ).cumsum()
 
-    save_to_minio(
-        result_df,
-        object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
-    )
+#         return (
+#             x
+#             .groupby(groups)
+#             .cumsum()
+#             .max()
+#         )
 
-    return result_df
+#     feature_col = f"f_order_value_decline_streak_l{quarters_window}q"
+
+
+#     result_df = (
+#         quarter_df
+#         .groupby("cus_id")["is_decline"]
+#         .apply(max_streak)
+#         .fillna(0)
+#         .astype(int)
+#         .reset_index(name=feature_col)
+#     )
+
+#     save_to_minio(
+#         result_df,
+#         object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
+#     )
+
+#     return result_df
 
 
 def transform_order_value_decline_streak_lxm(

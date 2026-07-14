@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.utils.common import load_config, month_date_range
+from src.utils.common import month_date_range
 from src.utils.minio_client import (
     save_to_minio,
     extract_data_by_date,
@@ -79,7 +79,7 @@ def transform_usage_lxm(
         day_partition_key=day_partition_key,
     )
 
-    usage_col = (f"f_usage_duration_l{months_window}m")
+    usage_col = f"f_usage_duration_l{months_window}m"
 
     result_df = (
         day_df

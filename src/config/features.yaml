@@ -148,15 +148,15 @@ features:
     input:
       months_window: 6
 
-  - name: order_value_decline_streak_l3q
-    module: src.data_processing.transform.order
-    day_feature: order
-    day_function: transform_order_by_day
-    function: transform_order_value_decline_streak_lq
-    day_prefix: clean/fts/order/day
-    month_prefix: clean/fts/order/value_decline_streak_l3q
-    input:
-      quarters_window: 3
+  # - name: order_value_decline_streak_l3q
+  #   module: src.data_processing.transform.order
+  #   day_feature: order
+  #   day_function: transform_order_by_day
+  #   function: transform_order_value_decline_streak_lq
+  #   day_prefix: clean/fts/order/day
+  #   month_prefix: clean/fts/order/value_decline_streak_l3q
+  #   input:
+  #     quarters_window: 3
 
   - name: gmv_l3m #done
     module: src.data_processing.transform.gmv
