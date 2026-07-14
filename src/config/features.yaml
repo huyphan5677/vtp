@@ -118,15 +118,25 @@ features:
       min_age: 20
       max_age: 50
 
-  - name: usage_duration_l12m
+  - name: usage_duration_l4m
     module: src.data_processing.transform.usage_duration
     day_feature: usage_duration
     day_function: transform_usage_duration_by_day
     function: transform_usage_duration_lxm
     day_prefix: clean/fts/usage_duration/day
-    month_prefix: clean/fts/usage_duration/month_l12m
+    month_prefix: clean/fts/usage_duration/month_l4m
     input:
-      months_window: 12
+      months_window: 4
+
+  - name: usage_duration_group_l4m
+    module: src.data_processing.transform.profile
+    day_feature: profile
+    day_function: transform_profile_by_day
+    function: transform_usage_duration_group_lxm
+    day_prefix: clean/fts/profile/day
+    month_prefix: clean/fts/profile/usage_duration_group_l4m
+    input:
+      months_window: 4
 
   - name: sales_region_l12m
     module: src.data_processing.transform.sales_region
