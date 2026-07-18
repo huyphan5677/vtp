@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import numpy as np
 
 from src.utils.common import month_date_range
 from src.utils.minio_client import (
@@ -18,8 +19,6 @@ def transform_order_by_day(
 ) -> pd.DataFrame:
     """Giai đoạn ngày: đọc raw ngày `date` từ MinIO, làm sạch, lưu xuống
     `day_prefix`/`day_partition_key`={date}/.
-
-    day_prefix, raw_day_prefix, day_partition_key đều lấy từ features.yaml.
 
     -> trả về dữ liệu ngày đã làm sạch, 3 cột: cus_id, count, value
     """
@@ -170,15 +169,20 @@ def transform_order_avg_bin_lxm(
 
     bin_col = f"f_order_avg_{output_prefix}_bin_l{months_window}m"
 
+    # ----------------------------
+    # Chia thành n_bins theo rank
+    # ----------------------------
+    rank = avg_df["avg_metric"].rank(method="first")
+
+    score = np.ceil(rank / rank.max() * n_bins).astype(int)
+
+    score = score.clip(1, n_bins)
+
+    width = len(str(n_bins))
+
     avg_df[bin_col] = (
-        pd.qcut(
-            avg_df["avg_metric"],
-            q=n_bins,
-            labels=False,
-            duplicates="drop",
-        )
-        .astype(str)
-        .str.zfill(2)
+        score.astype(str)
+        .str.zfill(width)
     )
 
     result_df = avg_df[["cus_id", bin_col]]
@@ -535,6 +539,11 @@ def transform_order_value_decline_streak_lxm(
         .reset_index(name=feature_col)
     )
 
+    # Giới hạn streak tối đa 5 tháng
+    result_df[feature_col] = (
+        result_df[feature_col]
+        .clip(0, 5)
+)
     save_to_minio(
         result_df,
         object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",

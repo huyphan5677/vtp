@@ -85,6 +85,7 @@ features:
     month_prefix: clean/fts/order/min_value_l6m
     input:
       months_window: 6
+      min_value: 3000000
 
   - name: order_sum_value_handy_l12m
     module: src.data_processing.transform.order
@@ -110,11 +111,10 @@ features:
     module: src.data_processing.transform.age
     day_feature: age
     day_function: transform_age_by_day
-    function: transform_age_lxm
+    function: transform_age_latest
     day_prefix: clean/fts/age/day
-    month_prefix: clean/fts/age/month_l12m
+    month_prefix: clean/fts/age/month
     input:
-      months_window: 12
       min_age: 20
       max_age: 50
 
