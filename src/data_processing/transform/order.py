@@ -8,6 +8,9 @@ from src.utils.minio_client import (
     save_to_minio,
     extract_data_by_date,
     extract_data_by_range,
+    object_exists,
+    save_artifact,
+    load_artifact,
 )
 
 
@@ -39,12 +42,12 @@ def transform_order_by_day(
     # 3, Lưu dữ liệu đã làm sạch xuống MinIO
     save_to_minio(
         clean_df,
-        object_name=f"{day_prefix}/{day_partition_key}={date}/data.parquet",
+        object_name=f"{day_prefix}/daily/date={date}/data.parquet",
     )
     return clean_df
 
 
-def transform_order_lxm(
+def transform_order_avg_lxm(
     month: str,
     months_window: int,
     # min_count: float,
@@ -52,7 +55,7 @@ def transform_order_lxm(
     day_prefix: str,
     month_prefix: str,
     day_partition_key: str,
-    month_partition_key: str,
+    #month_partition_key: str,
 ) -> pd.DataFrame:
     """Giai đoạn tháng (có window): tự load `months_window` tháng dữ liệu
     ngày đã clean (`day_prefix`), tính avg count/value theo cus_id, so với
@@ -117,7 +120,7 @@ def transform_order_lxm(
     # 5, Lưu dữ liệu đã làm sạch xuống.
     save_to_minio(
         result_df,
-        object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
+        object_name=f"{month_prefix}/month={month}/data.parquet",
     )
     return result_df
 
@@ -127,69 +130,93 @@ def transform_order_avg_bin_lxm(
     months_window: int,
     n_bins: int,
     metric_col: str,
-    output_prefix: str,
-    day_prefix: str,
+    #output_prefix: str,
+    avg_month_prefix: str,
     month_prefix: str,
-    day_partition_key: str,
     month_partition_key: str,
 ) -> pd.DataFrame:
     """
-    Chia giá trị trung bình theo tháng thành n_bins nhóm.
-    metric_col:
-        - value  -> avg_value
-        - count  -> avg_count
+    Chia feature avg order count/value LxM thành n_bins.
 
-    Trả về:
+    metric_col:
+        - count -> f_order_avg_count_l{N}m
+        - value -> f_order_avg_value_l{N}m
+
+    Output:
         cus_id, f_order_avg_{metric_col}_bin_l{N}m
     """
 
-    start_month = (
-        pd.Period(month, freq="M") - months_window + 1
-    ).strftime("%Y%m")
-
-    start_date = month_date_range(start_month)[0]
-    end_date = month_date_range(month)[1]
-
-    day_df = extract_data_by_range(
-        start_date,
-        end_date,
-        prefix=day_prefix,
-        day_partition_key=day_partition_key,
+    # 1. Load feature avg đã được tính trước
+    avg_df = extract_data_by_date(
+        month,
+        prefix=avg_month_prefix,
+        day_partition_key=month_partition_key,
     )
 
-    day_df["month"] = (day_df[day_partition_key].astype(str).str[:6].astype(int))
+    # 2. Xác định feature cần bin
+    if metric_col not in ("count", "value"):
+        raise ValueError(
+            f"metric_col không hợp lệ: {metric_col}"
+        )
 
-    avg_df = (
-        day_df
-        .groupby(["cus_id", "month"], as_index=False)
-        .agg(monthly_metric=(metric_col, "sum"))
-        .groupby("cus_id", as_index=False)
-        .agg(avg_metric=("monthly_metric", "mean"))
+    metric_feature = (
+        f"f_order_avg_{metric_col}_l{months_window}m"
     )
 
-    bin_col = f"f_order_avg_{output_prefix}_bin_l{months_window}m"
+    avg_df = avg_df.rename(
+        columns={
+            metric_feature: "avg_metric"
+        }
+    )
 
-    # ----------------------------
-    # Chia thành n_bins theo rank
-    # ----------------------------
-    rank = avg_df["avg_metric"].rank(method="first")
+    avg_df = avg_df.dropna(
+        subset=["avg_metric"]
+    )
 
-    score = np.ceil(rank / rank.max() * n_bins).astype(int)
+    # 3. Artifact chứa quantile của bins
+    artifact_name = (
+        f"artifacts/order/"
+        f"avg_{metric_col}_l{months_window}_{n_bins}bins.pkl"
+)
 
-    score = score.clip(1, n_bins)
+    # 4. Nếu chưa có artifact -> fit bins
+    if not object_exists(artifact_name):
+        quantiles = np.quantile(
+            avg_df["avg_metric"],
+            np.linspace(0, 1, n_bins + 1)[1:-1],
+        )
+        quantiles = np.unique(quantiles)
 
-    width = len(str(n_bins))
+        save_artifact(quantiles, artifact_name)
+
+    # 5. Nếu có rồi -> load lại bins
+    else:
+        quantiles = load_artifact(artifact_name)
+
+    # 6. 6. Gán bin
+    score = np.digitize(
+        avg_df["avg_metric"],
+        quantiles,
+        right=True,
+    ) + 1
+
+    score = np.clip(score, 1, n_bins)
+
+    bin_col = (
+        f"f_order_avg_{metric_col}"
+        f"_bin_l{months_window}m"
+    )
 
     avg_df[bin_col] = (
         score.astype(str)
-        .str.zfill(width)
+        .str.zfill(len(str(n_bins)))
     )
 
     result_df = avg_df[["cus_id", bin_col]]
 
     save_to_minio(
         result_df,
-        object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
+        object_name=f"{month_prefix}/month={month}/data.parquet",
     )
 
     return result_df
@@ -201,7 +228,7 @@ def transform_order_value_summary_lxm(
     day_prefix: str,
     month_prefix: str,
     day_partition_key: str,
-    month_partition_key: str,
+    #month_partition_key: str,
 ) -> pd.DataFrame:
     """Tổng doanh thu (VND) theo từng tháng->lấy min + trong toàn bộ window(4digits)
 
@@ -249,7 +276,7 @@ def transform_order_value_summary_lxm(
 
     save_to_minio(
         result_df,
-        object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
+        object_name=f"{month_prefix}/month={month}/data.parquet",
     )
     return result_df
 
@@ -260,7 +287,7 @@ def transform_success_order_all_months_lxm(
     day_prefix: str,
     month_prefix: str,
     day_partition_key: str,
-    month_partition_key: str,
+    #month_partition_key: str,
 ) -> pd.DataFrame:
     """
     Kiểm tra trong X tháng gần nhất:
@@ -307,7 +334,7 @@ def transform_success_order_all_months_lxm(
 
     save_to_minio(
         result_df,
-        object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
+        object_name=f"{month_prefix}/month={month}/data.parquet",
     )
 
     return result_df
@@ -421,7 +448,7 @@ def transform_order_value_decline_streak_lxm(
     day_prefix: str,
     month_prefix: str,
     day_partition_key: str,
-    month_partition_key: str,
+    #month_partition_key: str,
 ) -> pd.DataFrame:
     """
     Đếm chuỗi tháng giảm doanh thu liên tục dài nhất.
@@ -546,7 +573,7 @@ def transform_order_value_decline_streak_lxm(
 )
     save_to_minio(
         result_df,
-        object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
+        object_name=f"{month_prefix}/month={month}/data.parquet",
     )
 
     return result_df

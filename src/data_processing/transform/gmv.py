@@ -52,7 +52,7 @@ def transform_gmv_by_day(
 
     save_to_minio(
         clean_df,
-        object_name=f"{day_prefix}/{day_partition_key}={date}/data.parquet",
+        object_name=f"{day_prefix}/daily/date={date}/data.parquet",
     )
     return clean_df
 
@@ -63,7 +63,7 @@ def transform_gmv_lxm(
     day_prefix: str,
     month_prefix: str,
     day_partition_key: str,
-    month_partition_key: str,
+    #month_partition_key: str,
 ) -> pd.DataFrame:
     """Giai đoạn tháng (có window): tự load `months_window` tháng dữ liệu
     ngày đã clean (`day_prefix`), ước tính GMV cho COD + Non-COD, rồi tự lưu xuống `month_prefix`.
@@ -188,7 +188,7 @@ def transform_gmv_lxm(
 
     save_to_minio(
         result_df,
-        object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
+        object_name=f"{month_prefix}/month={month}/data.parquet",
     )
 
     return result_df
