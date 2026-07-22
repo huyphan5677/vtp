@@ -4,7 +4,9 @@ import io
 
 import boto3
 import pandas as pd
+import pickle
 
+from botocore.exceptions import ClientError
 from src.utils.common import load_config
 
 
@@ -145,3 +147,43 @@ def extract_data_by_range(
         (day_partition_key, "<=", int(end_date)),
     ]
     return read_minio_parquet(prefix, filters=filters)
+
+def object_exists(object_name: str) -> bool:
+    """Kiểm tra object có tồn tại trên MinIO hay không."""
+    bucket_name, _, _, _ = get_minio_config()
+    client = get_minio_client()
+
+    try:
+        client.head_object(Bucket=bucket_name, Key=object_name)
+        return True
+    except ClientError:
+        return False
+
+
+def save_artifact(obj, object_name: str) -> None:
+    """Lưu artifact (pickle) lên MinIO."""
+    bucket_name, _, _, _ = get_minio_config()
+    client = get_minio_client()
+
+    buffer = io.BytesIO()
+    pickle.dump(obj, buffer)
+    buffer.seek(0)
+
+    client.put_object(
+        Bucket=bucket_name,
+        Key=object_name,
+        Body=buffer,
+    )
+
+
+def load_artifact(object_name: str):
+    """Đọc artifact (pickle) từ MinIO."""
+    bucket_name, _, _, _ = get_minio_config()
+    client = get_minio_client()
+
+    obj = client.get_object(
+        Bucket=bucket_name,
+        Key=object_name,
+    )
+
+    return pickle.load(obj["Body"])
