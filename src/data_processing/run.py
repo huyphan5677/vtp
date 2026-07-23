@@ -39,7 +39,7 @@ def _get_day_feature_config(day_feature: str) -> dict:
     order_l3m/order_l6m dùng chung "order") — chỉ cần tìm 1 entry khớp.
     """
     for feature_cfg in load_config(FEATURES_CONFIG_FILE)["features"]:
-        if feature_cfg["day_feature"] == day_feature:
+        if feature_cfg.get("day_feature") == day_feature:
             return feature_cfg
     raise ValueError(
         f"Không tìm thấy day_feature '{day_feature}' trong features.yaml"

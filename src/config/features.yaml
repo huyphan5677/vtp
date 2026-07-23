@@ -31,7 +31,7 @@ features:
     day_feature: order
     day_function: transform_order_by_day
     function: transform_order_avg_lxm
-    day_prefix: clean/fts/order
+    day_prefix: clean/fts/order/day
     month_prefix: clean/fts/order/month_l3m
     input:
       months_window: 3
@@ -43,7 +43,7 @@ features:
     day_feature: order
     day_function: transform_order_by_day
     function: transform_order_avg_lxm
-    day_prefix: clean/fts/order
+    day_prefix: clean/fts/order/day
     month_prefix: clean/fts/order/month_l6m
     input:
       months_window: 6
@@ -55,12 +55,12 @@ features:
     #day_feature: order
     #day_function: transform_order_by_day
     function: transform_order_avg_bin_lxm
-    avg_month_prefix: clean/fts/order/month_l3m
     month_prefix: clean/fts/order/avg_count_bin_l3m
     input:
       months_window: 3
       n_bins: 20
       metric_col: count
+      avg_month_prefix: clean/fts/order/month_l3m
       #output_prefix: count
 
   - name: order_avg_count_bin_l6m
@@ -68,12 +68,12 @@ features:
     #day_feature: order
     #day_function: transform_order_by_day
     function: transform_order_avg_bin_lxm
-    avg_month_prefix: clean/fts/order/month_l6m
     month_prefix: clean/fts/order/avg_count_bin_l6m
     input:
       months_window: 6
       n_bins: 20
       metric_col: count
+      avg_month_prefix: clean/fts/order/month_l6m
       #output_prefix: count
 
   - name: order_avg_value_bin_l3m
@@ -81,12 +81,12 @@ features:
     #day_feature: order
     #day_function: transform_order_by_day
     function: transform_order_avg_bin_lxm
-    avg_month_prefix: clean/fts/order/month_l3m
     month_prefix: clean/fts/order/avg_value_bin_l3m
     input:
       months_window: 3
       n_bins: 20
       metric_col: value
+      avg_month_prefix: clean/fts/order/month_l3m
       #output_prefix: value
 
   - name: order_avg_value_bin_l6m
@@ -94,12 +94,12 @@ features:
     #day_feature: order
     #day_function: transform_order_by_day
     function: transform_order_avg_bin_lxm
-    avg_month_prefix: clean/fts/order/month_l6m
     month_prefix: clean/fts/order/avg_value_bin_l6m
     input:
       months_window: 6
       n_bins: 20
       metric_col: value
+      avg_month_prefix: clean/fts/order/month_l6m
       #output_prefix: value
 
   - name: order_min_value_l6m
@@ -107,7 +107,7 @@ features:
     day_feature: order
     day_function: transform_order_by_day
     function: transform_order_value_summary_lxm
-    day_prefix: clean/fts/order
+    day_prefix: clean/fts/order/day
     month_prefix: clean/fts/order/min_value_l6m
     input:
       months_window: 6
@@ -118,7 +118,7 @@ features:
     day_feature: order
     day_function: transform_order_by_day
     function: transform_order_value_summary_lxm
-    day_prefix: clean/fts/order
+    day_prefix: clean/fts/order/day
     month_prefix: clean/fts/order/sum_value_handy_l12m
     input:
       months_window: 12
@@ -128,7 +128,7 @@ features:
     day_feature: order
     day_function: transform_order_by_day
     function: transform_success_order_all_months_lxm
-    day_prefix: clean/fts/order
+    day_prefix: clean/fts/order/day
     month_prefix: clean/fts/order/success_order_all_months_l4m
     input:
       months_window: 4
@@ -138,7 +138,7 @@ features:
     day_feature: age
     day_function: transform_age_by_day
     function: transform_age_latest
-    day_prefix: clean/fts/age
+    day_prefix: clean/fts/age/day
     month_prefix: clean/fts/age/month
     input:
       min_age: 20
@@ -149,7 +149,7 @@ features:
     day_feature: usage_duration
     day_function: transform_usage_duration_by_day
     function: transform_usage_latest
-    day_prefix: clean/fts/usage_duration
+    day_prefix: clean/fts/usage_duration/day
     month_prefix: clean/fts/usage_duration/month
 
   - name: sales_region_latest
@@ -157,7 +157,7 @@ features:
     day_feature: sales_region
     day_function: transform_sales_region_by_day
     function: transform_sales_region_latest
-    day_prefix: clean/fts/sales_region
+    day_prefix: clean/fts/sales_region/day
     month_prefix: clean/fts/sales_region/month
 
 
@@ -166,7 +166,7 @@ features:
     day_feature: order
     day_function: transform_order_by_day
     function: transform_order_value_decline_streak_lxm
-    day_prefix: clean/fts/order
+    day_prefix: clean/fts/order/day
     month_prefix: clean/fts/order/value_decline_streak_l6m
     input:
       months_window: 6
@@ -186,7 +186,7 @@ features:
     day_feature: gmv
     day_function: transform_gmv_by_day
     function: transform_gmv_lxm
-    day_prefix: clean/fts/gmv
+    day_prefix: clean/fts/gmv/day
     month_prefix: clean/fts/gmv/month_l3m
     input:
       months_window: 3
@@ -196,7 +196,7 @@ features:
     day_feature: gmv
     day_function: transform_gmv_by_day
     function: transform_gmv_lxm
-    day_prefix: clean/fts/gmv
+    day_prefix: clean/fts/gmv/day
     month_prefix: clean/fts/gmv/month_l12m
     input:
       months_window: 12

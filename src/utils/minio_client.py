@@ -187,3 +187,6 @@ def load_artifact(object_name: str):
     )
 
     return pickle.load(obj["Body"])
+
+# def load_data_to_minio(df: pd.DataFrame, object_name: str):
+#     return save_to_minio(df, object_name)

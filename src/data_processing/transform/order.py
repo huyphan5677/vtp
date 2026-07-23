@@ -41,7 +41,7 @@ def transform_order_by_day(
     # 3, Lưu dữ liệu đã làm sạch xuống MinIO
     save_to_minio(
         clean_df,
-        object_name=f"{day_prefix}/daily/date={date}/data.parquet",
+        object_name=f"{day_prefix}/{day_partition_key}={date}/data.parquet",
     )
     return clean_df
 
@@ -54,7 +54,7 @@ def transform_order_avg_lxm(
     day_prefix: str,
     month_prefix: str,
     day_partition_key: str,
-    #month_partition_key: str,
+    month_partition_key: str,
 ) -> pd.DataFrame:
     """Giai đoạn tháng (có window): tự load `months_window` tháng dữ liệu
     ngày đã clean (`day_prefix`), tính avg count/value theo cus_id, so với
@@ -119,7 +119,7 @@ def transform_order_avg_lxm(
     # 5, Lưu dữ liệu đã làm sạch xuống.
     save_to_minio(
         result_df,
-        object_name=f"{month_prefix}/month={month}/data.parquet",
+        object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
     )
     return result_df
 
@@ -207,15 +207,16 @@ def transform_order_avg_bin_lxm(
     )
 
     avg_df[bin_col] = (
-        score.astype(str)
-        .str.zfill(len(str(n_bins)))
-    )
+    pd.Series(score, index=avg_df.index)
+    .astype(str)
+    .str.zfill(len(str(n_bins)))
+)
 
     result_df = avg_df[["cus_id", bin_col]]
 
     save_to_minio(
         result_df,
-        object_name=f"{month_prefix}/month={month}/data.parquet",
+        object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
     )
 
     return result_df
@@ -227,7 +228,7 @@ def transform_order_value_summary_lxm(
     day_prefix: str,
     month_prefix: str,
     day_partition_key: str,
-    #month_partition_key: str,
+    month_partition_key: str,
 ) -> pd.DataFrame:
     """Tổng doanh thu (VND) theo từng tháng->lấy min + trong toàn bộ window(4digits)
 
@@ -275,7 +276,7 @@ def transform_order_value_summary_lxm(
 
     save_to_minio(
         result_df,
-        object_name=f"{month_prefix}/month={month}/data.parquet",
+        object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
     )
     return result_df
 
@@ -286,7 +287,7 @@ def transform_success_order_all_months_lxm(
     day_prefix: str,
     month_prefix: str,
     day_partition_key: str,
-    #month_partition_key: str,
+    month_partition_key: str,
 ) -> pd.DataFrame:
     """
     Kiểm tra trong X tháng gần nhất:
@@ -333,7 +334,7 @@ def transform_success_order_all_months_lxm(
 
     save_to_minio(
         result_df,
-        object_name=f"{month_prefix}/month={month}/data.parquet",
+        object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
     )
 
     return result_df
@@ -447,7 +448,7 @@ def transform_order_value_decline_streak_lxm(
     day_prefix: str,
     month_prefix: str,
     day_partition_key: str,
-    #month_partition_key: str,
+    month_partition_key: str,
 ) -> pd.DataFrame:
     """
     Đếm chuỗi tháng giảm doanh thu liên tục dài nhất.
@@ -572,7 +573,7 @@ def transform_order_value_decline_streak_lxm(
 )
     save_to_minio(
         result_df,
-        object_name=f"{month_prefix}/month={month}/data.parquet",
+        object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
     )
 
     return result_df

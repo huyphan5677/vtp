@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import ast
 
 from src.utils.common import month_date_range
 from src.utils.minio_client import (
@@ -32,8 +33,18 @@ def transform_age_by_day(
     #    tính tuổi (age_years) từ ngày sinh
     clean_df = raw_df[["cus_id", "ngay_sinh"]].copy()
     clean_df = clean_df.dropna(subset=["cus_id"])
-    clean_df["cus_id"] = clean_df["cus_id"].astype(str)
-
+    # Chuẩn hóa cus_id
+    clean_df["cus_id"] = clean_df["cus_id"].apply(
+    lambda x: ast.literal_eval(x).get("member0")
+    if isinstance(x, str) and x.startswith("{")
+    else (x.get("member0") if isinstance(x, dict) else x)
+)
+    clean_df["cus_id"] = (
+    clean_df["cus_id"]
+    .astype(float)
+    .astype(int)
+    .astype(str)
+)
     dob = pd.to_numeric(clean_df["ngay_sinh"], errors="coerce")
     dob = dob.apply(lambda x: x if x < MAX_TIMESTAMP else None)
     dob = pd.to_datetime(dob, unit="ms", errors="coerce")
@@ -45,7 +56,7 @@ def transform_age_by_day(
     # 3, Lưu dữ liệu đã làm sạch xuống MinIO
     save_to_minio(
         clean_df,
-        object_name=f"{day_prefix}/daily/date={date}/data.parquet",
+        object_name=f"{day_prefix}/{day_partition_key}={date}/data.parquet",
     )
     return clean_df
 
@@ -55,6 +66,7 @@ def transform_age_latest(
     day_prefix: str,
     month_prefix: str,
     day_partition_key: str,
+    month_partition_key: str,
 ) -> pd.DataFrame:
 
     # lấy ngày cuối tháng
@@ -81,7 +93,7 @@ def transform_age_latest(
 
     save_to_minio(
         result_df,
-        object_name=f"{month_prefix}/month={month}/data.parquet",
+        object_name=f"{month_prefix}/{month_partition_key}={month}/data.parquet",
     )
 
 
