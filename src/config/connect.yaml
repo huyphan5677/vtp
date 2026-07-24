@@ -10,7 +10,8 @@ postgres:
 
 # Connect to MinIO
 minio:
-  endpoint: minio:9990
+  #endpoint: minio:9990
+  endpoint: localhost:9990 #test local
   access_key: minio
   secret_key: minio123
   bucket: clean-202605

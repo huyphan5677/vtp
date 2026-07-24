@@ -16,7 +16,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 import pandas as pd
 
-from src.utils.minio_client import load_data_to_minio
+#from src.utils.minio_client import load_data_to_minio
+from src.utils.minio_client import save_to_minio
 
 
 LOCAL_RAW_DIR = (
@@ -36,7 +37,8 @@ def main() -> None:
             continue
 
         df = pd.read_parquet(parquet_files[0])
-        load_data_to_minio(
+        #load_data_to_minio(
+        save_to_minio(
             df,
             object_name=f"raw/hitech_day/partition_date={date}/data_hitech_day.parquet",
         )
