@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 import numpy as np
+import ast
 
 from src.utils.common import month_date_range
 from src.utils.minio_client import (
@@ -33,7 +34,16 @@ def transform_order_by_day(
     #    đổi tên don_ptc -> count, tong_tien -> value
     clean_df = raw_df[["cus_id", "don_ptc", "tong_tien"]].copy()
     clean_df = clean_df.dropna(subset=["cus_id"])
-    clean_df["cus_id"] = clean_df["cus_id"].astype(str)
+    clean_df["cus_id"] = clean_df["cus_id"].apply(
+    lambda x: ast.literal_eval(x).get("member0")
+    if isinstance(x, str) and x.startswith("{")
+    else (x.get("member0") if isinstance(x, dict) else x))
+    clean_df["cus_id"] = (
+    clean_df["cus_id"]
+    .astype(float)
+    .astype(int)
+    .astype(str))
+
     clean_df = clean_df.rename(
         columns={"don_ptc": "count", "tong_tien": "value"}
     )

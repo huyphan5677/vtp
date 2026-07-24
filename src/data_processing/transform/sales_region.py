@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
-
+import ast
 from src.utils.common import month_date_range
 from src.utils.minio_client import (
     save_to_minio,
@@ -27,11 +27,15 @@ def transform_sales_region_by_day(
     clean_df = raw_df[["cus_id", "ma_tinh_hoatdong_chinh"]].copy()
     clean_df = clean_df.rename(columns={"ma_tinh_hoatdong_chinh": "sale_region"})
     clean_df = clean_df.dropna(subset=["cus_id"])
+    clean_df["cus_id"] = clean_df["cus_id"].apply(
+    lambda x: ast.literal_eval(x).get("member0")
+    if isinstance(x, str) and x.startswith("{")
+    else (x.get("member0") if isinstance(x, dict) else x))
     clean_df["cus_id"] = (
-    clean_df["cus_id"].dropna()
-    .apply(lambda x: x.get("member0") if isinstance(x, dict) else x)
-    .astype(str)
-)
+    clean_df["cus_id"]
+    .astype(float)
+    .astype(int)
+    .astype(str))
 
     save_to_minio(
         clean_df,

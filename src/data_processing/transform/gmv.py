@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 import numpy as np
+import ast
 
 from src.utils.common import month_date_range
 from src.utils.minio_client import (
@@ -45,10 +46,16 @@ def transform_gmv_by_day(
     .dropna(subset=["cus_id"])
     .rename(columns={"don_ptc": "count", "tong_tien": "value"})
 )
+    # Chuẩn hóa cus_id
+    clean_df["cus_id"] = clean_df["cus_id"].apply(
+    lambda x: ast.literal_eval(x).get("member0")
+    if isinstance(x, str) and x.startswith("{")
+    else (x.get("member0") if isinstance(x, dict) else x))
     clean_df["cus_id"] = (
-        clean_df["cus_id"].apply(lambda x: x.get("member0") if isinstance(x, dict) else x).astype(str)
-    )
-
+    clean_df["cus_id"]
+    .astype(float)
+    .astype(int)
+    .astype(str))
 
     save_to_minio(
         clean_df,
